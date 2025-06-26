@@ -1,6 +1,12 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import {
+  useState,
+  useRef,
+  useEffect,
+  type Dispatch,
+  type SetStateAction,
+} from "react"
 import { useFormState, useFormStatus } from "react-dom"
 import { ArrowUp, Settings } from "lucide-react"
 
@@ -9,7 +15,13 @@ import { ChatMessage, type ChatMessageProps } from "@/components/chat-message"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Logo } from "@/components/icons"
 import { useToast } from "@/hooks/use-toast"
@@ -43,33 +55,42 @@ function SubmitButton() {
   )
 }
 
-export default function Home() {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [formState, formAction] = useFormState(submitMessage, initialState)
-  const formRef = useRef<HTMLFormElement>(null)
+interface PageContentProps {
+  messages: Message[]
+  suggestions: string[]
+  formState: typeof initialState
+  setMessages: Dispatch<SetStateAction<Message[]>>
+  handleSuggestionClick: (suggestion: string) => void
+  formRef: React.RefObject<HTMLFormElement>
+}
+
+function PageContent({
+  messages,
+  suggestions,
+  formState,
+  setMessages,
+  handleSuggestionClick,
+  formRef,
+}: PageContentProps) {
+  const { pending } = useFormStatus()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
-  const { pending } = useFormStatus()
 
   useEffect(() => {
     if (formState.response) {
-      setMessages((prev) => {
-        // Just add assistant's response. User message was added optimistically.
-        return [...prev, { role: "assistant", content: formState.response }]
-      })
-      setSuggestions(formState.suggestions || [])
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: formState.response },
+      ])
     }
     if (formState.error) {
-      // Remove optimistic user message on error
       setMessages((prev) => prev.slice(0, prev.length - 1))
       toast({
         variant: "destructive",
         title: "An error occurred",
         description: formState.error,
       })
-      setSuggestions([])
     }
     if (!pending) {
       formRef.current?.reset()
@@ -77,8 +98,7 @@ export default function Home() {
         textAreaRef.current.style.height = "auto"
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formState, toast])
+  }, [formState, pending, setMessages, formRef, toast])
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -87,7 +107,7 @@ export default function Home() {
         behavior: "smooth",
       })
     }
-  }, [messages, suggestions])
+  }, [messages, suggestions, pending])
 
   const handleTextareaInput = (event: React.FormEvent<HTMLTextAreaElement>) => {
     const textarea = event.currentTarget
@@ -100,23 +120,6 @@ export default function Home() {
       event.preventDefault()
       formRef.current?.requestSubmit()
     }
-  }
-
-  const clientAction = (formData: FormData) => {
-    const prompt = formData.get("prompt") as string
-    if (prompt) {
-      setSuggestions([])
-      setMessages((prev) => [...prev, { role: "user", content: prompt }])
-      formAction(formData)
-    }
-  }
-
-  const handleSuggestionClick = (suggestion: string) => {
-    setSuggestions([])
-    setMessages((prev) => [...prev, { role: "user", content: suggestion }])
-    const formData = new FormData()
-    formData.append("prompt", suggestion)
-    formAction(formData)
   }
 
   return (
@@ -189,11 +192,7 @@ export default function Home() {
 
       <footer className="border-t bg-card">
         <div className="container mx-auto max-w-3xl p-4">
-          <form
-            ref={formRef}
-            action={clientAction}
-            className="relative"
-          >
+          <div className="relative">
             <Textarea
               ref={textAreaRef}
               name="prompt"
@@ -204,9 +203,55 @@ export default function Home() {
               disabled={pending}
             />
             <SubmitButton />
-          </form>
+          </div>
         </div>
       </footer>
     </div>
+  )
+}
+
+export default function Home() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [formState, formAction] = useFormState(submitMessage, initialState)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  const clientAction = (formData: FormData) => {
+    const prompt = formData.get("prompt") as string
+    if (prompt.trim()) {
+      setSuggestions([])
+      setMessages((prev) => [...prev, { role: "user", content: prompt }])
+      formAction(formData)
+    }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSuggestions([])
+    setMessages((prev) => [...prev, { role: "user", content: suggestion }])
+    const formData = new FormData()
+    formData.append("prompt", suggestion)
+    formAction(formData)
+  }
+
+  useEffect(() => {
+    if (formState.suggestions) {
+      setSuggestions(formState.suggestions)
+    }
+    if (formState.error) {
+      setSuggestions([])
+    }
+  }, [formState])
+
+  return (
+    <form ref={formRef} action={clientAction}>
+      <PageContent
+        messages={messages}
+        suggestions={suggestions}
+        formState={formState}
+        setMessages={setMessages}
+        handleSuggestionClick={handleSuggestionClick}
+        formRef={formRef}
+      />
+    </form>
   )
 }
