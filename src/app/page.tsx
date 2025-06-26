@@ -6,8 +6,9 @@ import {
   useEffect,
   type Dispatch,
   type SetStateAction,
+  useActionState,
 } from "react"
-import { useFormState, useFormStatus } from "react-dom"
+import { useFormStatus } from "react-dom"
 import { ArrowUp, Settings } from "lucide-react"
 
 import { submitMessage } from "@/app/actions"
@@ -213,7 +214,7 @@ function PageContent({
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
   const [suggestions, setSuggestions] = useState<string[]>([])
-  const [formState, formAction] = useFormState(submitMessage, initialState)
+  const [formState, formAction] = useActionState(submitMessage, initialState)
   const formRef = useRef<HTMLFormElement>(null)
 
   const clientAction = (formData: FormData) => {
