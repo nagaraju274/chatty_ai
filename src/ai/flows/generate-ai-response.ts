@@ -13,6 +13,7 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { filterInappropriateContent } from './filter-inappropriate-content';
 
 // Define the input schema
 const GenerateAIResponseInputSchema = z.object({
@@ -46,10 +47,8 @@ const filterContent = ai.defineTool({
   outputSchema: z.boolean().describe('True if the content is safe, false otherwise.'),
 },
 async (input) => {
-  // Placeholder implementation for content filtering.
-  // Replace this with your actual content filtering logic.
-  // This is a stub that always returns true.  Real code should inspect `input.text`.
-  return true;
+  const result = await filterInappropriateContent(input);
+  return result.isAppropriate;
 });
 
 // Define the prompt
@@ -58,8 +57,14 @@ const generateAIResponsePrompt = ai.definePrompt({
   input: {schema: GenerateAIResponseInputSchema},
   output: {schema: GenerateAIResponseOutputSchema},
   tools: [filterContent],
-  system: `You are a helpful and informative chatbot. Your role is to analyze both text prompts and any accompanying files (like images, text files, etc.) to provide comprehensive and accurate answers. If a file is provided, treat it as the primary source of context for your response. If the user's question contains potentially harmful content, use the filterContent tool to check the prompt. Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
-  prompt: `{{prompt}}{{#if photoDataUri}}\n\n--- Start of Uploaded File ---\n{{media url=photoDataUri}}\n--- End of Uploaded File ---{{/if}}`,
+  system: `You are a helpful and informative chatbot. Your role is to analyze both text prompts and any accompanying files (like images, text files, etc.) to provide comprehensive and accurate answers. If a file is provided, you MUST use it as the primary source of context for your response to the user's prompt. If the user's question contains potentially harmful content, use the filterContent tool to check the prompt. Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
+  prompt: `Based on the provided file, please answer the following question: {{prompt}}
+
+{{#if photoDataUri}}
+--- Start of Uploaded File ---
+{{media url=photoDataUri}}
+--- End of Uploaded File ---
+{{/if}}`,
   config: {
     safetySettings: [
       {
@@ -92,9 +97,9 @@ const generateAIResponseFlow = ai.defineFlow(
   },
   async input => {
     // Use the content filter tool
-    const isSafe = await filterContent({text: input.prompt});
+    const safetyCheck = await filterInappropriateContent({text: input.prompt});
 
-    if (!isSafe) {
+    if (!safetyCheck.isAppropriate) {
       return {
         response: 'I am sorry, I cannot respond to prompts containing potentially harmful content.',
         suggestions: [],
