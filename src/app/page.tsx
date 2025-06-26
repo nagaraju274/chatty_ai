@@ -8,7 +8,7 @@ import {
   useMemo,
 } from "react"
 import { useFormStatus } from "react-dom"
-import { ArrowUp, Settings, PlusCircle } from "lucide-react"
+import { ArrowUp, Settings, PlusCircle, Paperclip, X } from "lucide-react"
 
 import { submitMessage } from "@/app/actions"
 import { ChatMessage, type ChatMessageProps } from "@/components/chat-message"
@@ -78,6 +78,9 @@ interface PageContentProps {
   suggestions: string[]
   handleSuggestionClick: (suggestion: string) => void
   formRef: React.RefObject<HTMLFormElement>
+  attachedFile: { name: string; dataUri: string } | null
+  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void
+  handleRemoveFile: () => void
 }
 
 function PageContent({
@@ -85,10 +88,14 @@ function PageContent({
   suggestions,
   handleSuggestionClick,
   formRef,
+  attachedFile,
+  handleFileChange,
+  handleRemoveFile,
 }: PageContentProps) {
   const { pending } = useFormStatus()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!pending) {
@@ -193,16 +200,46 @@ function PageContent({
 
       <footer className="border-t bg-card">
         <div className="container mx-auto max-w-3xl p-4">
+          {attachedFile && (
+            <div className="mb-2 flex items-center justify-between rounded-md border bg-muted px-3 py-2 text-sm">
+              <span className="truncate">{attachedFile.name}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0"
+                onClick={handleRemoveFile}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
           <div className="relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
             <Textarea
               ref={textAreaRef}
               name="prompt"
               placeholder="Message Chatty..."
-              className="min-h-[44px] max-h-48 resize-none pr-14"
+              className="min-h-[44px] max-h-48 resize-none pr-24"
               onInput={handleTextareaInput}
               onKeyDown={handleKeyDown}
               disabled={pending}
             />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute bottom-2.5 right-12 h-8 w-8"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={pending}
+              aria-label="Attach file"
+            >
+              <Paperclip size={18} />
+            </Button>
             <SubmitButton />
           </div>
         </div>
@@ -215,6 +252,10 @@ export default function Home() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [attachedFile, setAttachedFile] = useState<{
+    name: string
+    dataUri: string
+  } | null>(null)
   const [formState, formAction] = useActionState(submitMessage, initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const { toast } = useToast()
@@ -235,18 +276,44 @@ export default function Home() {
   const handleNewChat = () => {
     setActiveConversationId(null)
     setSuggestions([])
+    setAttachedFile(null)
     formRef.current?.reset()
+  }
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (loadEvent) => {
+        const dataUri = loadEvent.target?.result as string
+        setAttachedFile({ name: file.name, dataUri })
+      }
+      reader.readAsDataURL(file)
+    }
+    if (event.target) {
+      event.target.value = ""
+    }
+  }
+
+  const handleRemoveFile = () => {
+    setAttachedFile(null)
   }
 
   const clientAction = (formData: FormData) => {
     const prompt = formData.get("prompt") as string
-    if (!prompt.trim()) {
+    if (!prompt.trim() && !attachedFile) {
       return
+    }
+
+    const submissionData = new FormData()
+    submissionData.append("prompt", prompt)
+    if (attachedFile?.dataUri) {
+      submissionData.append("photoDataUri", attachedFile.dataUri)
     }
 
     setSuggestions([])
     let conversationId = activeConversationId
-    
+
     if (conversationId === null) {
       conversationId = Date.now().toString()
       const newConversation: Conversation = {
@@ -254,19 +321,23 @@ export default function Home() {
         title: prompt.substring(0, 40) + (prompt.length > 40 ? "..." : ""),
         messages: [{ role: "user", content: prompt }],
       }
-      setConversations(prev => [newConversation, ...prev])
+      setConversations((prev) => [newConversation, ...prev])
       setActiveConversationId(conversationId)
     } else {
-      setConversations(prev =>
-        prev.map(c =>
+      setConversations((prev) =>
+        prev.map((c) =>
           c.id === conversationId
-            ? { ...c, messages: [...c.messages, { role: "user", content: prompt }] }
+            ? {
+                ...c,
+                messages: [...c.messages, { role: "user", content: prompt }],
+              }
             : c
         )
       )
     }
 
-    formAction(formData)
+    formAction(submissionData)
+    setAttachedFile(null)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -283,16 +354,16 @@ export default function Home() {
 
   useEffect(() => {
     if (!formState.response && !formState.error) return
-    if (!activeConversationId) return
+    if (activeConversationId === null) return
 
-    setConversations(prev =>
-      prev.map(c => {
+    setConversations((prev) =>
+      prev.map((c) => {
         if (c.id !== activeConversationId) return c
 
         let updatedMessages = [...c.messages]
 
         if (formState.error) {
-          if (updatedMessages[updatedMessages.length - 1]?.role === 'user') {
+          if (updatedMessages[updatedMessages.length - 1]?.role === "user") {
             updatedMessages.pop()
           }
           toast({
@@ -304,7 +375,7 @@ export default function Home() {
 
         if (formState.response) {
           const userMessageIndex = updatedMessages.findLastIndex(
-            m => m.role === "user" && !m.sentiment
+            (m) => m.role === "user" && !m.sentiment
           )
           if (userMessageIndex !== -1 && formState.sentiment) {
             updatedMessages[userMessageIndex] = {
@@ -312,7 +383,10 @@ export default function Home() {
               sentiment: formState.sentiment,
             }
           }
-          updatedMessages.push({ role: "assistant", content: formState.response })
+          updatedMessages.push({
+            role: "assistant",
+            content: formState.response,
+          })
         }
 
         return { ...c, messages: updatedMessages }
@@ -327,7 +401,7 @@ export default function Home() {
   }, [formState, activeConversationId, toast])
 
   const activeConversation = useMemo(
-    () => conversations.find(c => c.id === activeConversationId),
+    () => conversations.find((c) => c.id === activeConversationId),
     [conversations, activeConversationId]
   )
 
@@ -346,7 +420,7 @@ export default function Home() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {conversations.map(convo => (
+            {conversations.map((convo) => (
               <SidebarMenuItem key={convo.id}>
                 <SidebarMenuButton
                   onClick={() => setActiveConversationId(convo.id)}
@@ -367,6 +441,9 @@ export default function Home() {
             suggestions={suggestions}
             handleSuggestionClick={handleSuggestionClick}
             formRef={formRef}
+            attachedFile={attachedFile}
+            handleFileChange={handleFileChange}
+            handleRemoveFile={handleRemoveFile}
           />
         </form>
       </SidebarInset>

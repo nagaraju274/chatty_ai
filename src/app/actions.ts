@@ -5,12 +5,14 @@ import { analyzeSentiment } from "@/ai/flows/sentiment-analysis-flow"
 import { z } from "zod"
 
 const MessageSchema = z.object({
-  prompt: z.string().min(1, { message: "Message cannot be empty." }),
+  prompt: z.string(),
+  photoDataUri: z.string().optional(),
 })
 
 export async function submitMessage(prevState: any, formData: FormData) {
   const parsed = MessageSchema.safeParse({
     prompt: formData.get("prompt"),
+    photoDataUri: formData.get("photoDataUri"),
   })
 
   if (!parsed.success) {
@@ -18,10 +20,23 @@ export async function submitMessage(prevState: any, formData: FormData) {
     return { error: error || "Invalid input." }
   }
 
+  if (!parsed.data.prompt.trim() && !parsed.data.photoDataUri) {
+    return { error: "Please enter a message or upload a file." }
+  }
+
   try {
+    const aiResponsePromise = generateAIResponse({
+      prompt: parsed.data.prompt,
+      photoDataUri: parsed.data.photoDataUri,
+    })
+
+    const sentimentResponsePromise = parsed.data.prompt.trim()
+      ? analyzeSentiment({ text: parsed.data.prompt })
+      : Promise.resolve({ sentiment: "Neutral" as const })
+
     const [aiResponse, sentimentResponse] = await Promise.all([
-      generateAIResponse({ prompt: parsed.data.prompt }),
-      analyzeSentiment({ text: parsed.data.prompt }),
+      aiResponsePromise,
+      sentimentResponsePromise,
     ])
 
     return {

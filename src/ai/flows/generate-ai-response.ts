@@ -17,6 +17,12 @@ import {z} from 'genkit';
 // Define the input schema
 const GenerateAIResponseInputSchema = z.object({
   prompt: z.string().describe('The prompt to generate a response for.'),
+  photoDataUri: z
+    .string()
+    .optional()
+    .describe(
+      "An optional file, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+    ),
 });
 
 export type GenerateAIResponseInput = z.infer<typeof GenerateAIResponseInputSchema>;
@@ -51,9 +57,8 @@ const generateAIResponsePrompt = ai.definePrompt({
   input: {schema: GenerateAIResponseInputSchema},
   output: {schema: GenerateAIResponseOutputSchema},
   tools: [filterContent],
-  system: `You are a helpful and informative chatbot.  If the user's question contains potentially harmful content, use the filterContent tool to check the prompt.
-Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
-  prompt: `{{prompt}}`,
+  system: `You are a helpful and informative chatbot. Your role is to analyze both text prompts and any accompanying files (like images, text files, etc.) to provide comprehensive and accurate answers. If a file is provided, treat it as the primary source of context for your response. If the user's question contains potentially harmful content, use the filterContent tool to check the prompt. Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
+  prompt: `{{prompt}}{{#if photoDataUri}}\n\n--- Start of Uploaded File ---\n{{media url=photoDataUri}}\n--- End of Uploaded File ---{{/if}}`,
   config: {
     safetySettings: [
       {
