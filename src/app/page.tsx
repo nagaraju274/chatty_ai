@@ -227,11 +227,15 @@ export default function Home() {
   }
 
   const handleSuggestionClick = (suggestion: string) => {
-    setSuggestions([])
-    setMessages((prev) => [...prev, { role: "user", content: suggestion }])
-    const formData = new FormData()
-    formData.append("prompt", suggestion)
-    formAction(formData)
+    if (formRef.current) {
+      const promptTextarea = formRef.current.elements.namedItem(
+        "prompt"
+      ) as HTMLTextAreaElement | null
+      if (promptTextarea) {
+        promptTextarea.value = suggestion
+        formRef.current.requestSubmit()
+      }
+    }
   }
 
   useEffect(() => {
