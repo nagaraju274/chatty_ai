@@ -6,7 +6,7 @@ import { z } from "zod"
 
 const MessageSchema = z.object({
   prompt: z.string(),
-  photoDataUri: z.string().optional(),
+  photoDataUri: z.string().nullable().optional(),
 })
 
 export async function submitMessage(prevState: any, formData: FormData) {
