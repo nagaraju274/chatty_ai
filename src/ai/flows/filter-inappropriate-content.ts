@@ -66,6 +66,9 @@ const filterInappropriateContentFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await filterInappropriateContentPrompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("The content filter AI failed to generate a response.");
+    }
+    return output;
   }
 );
