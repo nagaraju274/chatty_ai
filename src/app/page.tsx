@@ -414,17 +414,7 @@ export default function Home() {
         return { ...c, messages: updatedMessages }
       })
     )
-  }, [formState, activeConversationId])
-  
-  useEffect(() => {
-    if (formState.error) {
-      toast({
-        variant: 'destructive',
-        title: 'An error occurred',
-        description: formState.error,
-      });
-    }
-  }, [formState.error, toast]);
+  }, [formState, activeConversationId, toast])
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConversationId),

@@ -43,6 +43,9 @@ const analyzeSentimentFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output) {
+      throw new Error("The AI failed to generate a sentiment analysis in the expected format.");
+    }
+    return output;
   }
 );
