@@ -1,0 +1,96 @@
+"use client"
+
+import { useState } from 'react'
+import { Bot, User, Check, Copy } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Button } from './ui/button'
+
+export interface ChatMessageProps {
+  message: {
+    role: "user" | "assistant"
+    content: string
+  }
+}
+
+const CodeBlock = ({ code }: { code: string }) => {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = () => {
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div className="relative my-2 font-code">
+      <Button
+        size="icon"
+        variant="ghost"
+        className="absolute top-2 right-2 h-7 w-7 text-white/80 hover:bg-white/10 hover:text-white"
+        onClick={handleCopy}
+      >
+        {copied ? <Check size={16} /> : <Copy size={16} />}
+      </Button>
+      <pre className="p-4 rounded-md bg-gray-950 dark:bg-black text-white overflow-x-auto">
+        <code>{code}</code>
+      </pre>
+    </div>
+  )
+}
+
+function renderContent(content: string) {
+    const parts = content.split(/(```[\s\S]*?```)/g);
+
+    return parts.map((part, index) => {
+        if (part.startsWith('```') && part.endsWith('```')) {
+            const codeContentRaw = part.slice(3, -3);
+            const langEndIndex = codeContentRaw.indexOf('\n');
+            const code = langEndIndex !== -1 ? codeContentRaw.substring(langEndIndex + 1) : codeContentRaw;
+            return <CodeBlock key={index} code={code.trim()} />;
+        }
+        return (
+            <span key={index}>
+                {part.split('\n').map((line, i, arr) => (
+                    <span key={i}>
+                        {line}
+                        {i < arr.length - 1 && <br />}
+                    </span>
+                ))}
+            </span>
+        );
+    });
+}
+
+
+export function ChatMessage({ message }: ChatMessageProps) {
+  const isAssistant = message.role === "assistant"
+
+  return (
+    <div
+      className={cn(
+        "flex items-start gap-4",
+        !isAssistant && "flex-row-reverse"
+      )}
+    >
+      <Avatar className="h-8 w-8">
+        <AvatarFallback className={cn(isAssistant && "bg-accent text-accent-foreground")}>
+          {isAssistant ? <Bot size={20} /> : <User size={20} />}
+        </AvatarFallback>
+      </Avatar>
+
+      <div
+        className={cn(
+          "max-w-xl break-words rounded-lg px-4 py-2 text-sm shadow-sm",
+          isAssistant
+            ? "bg-card text-card-foreground"
+            : "bg-primary text-primary-foreground"
+        )}
+      >
+        {renderContent(message.content)}
+      </div>
+    </div>
+  )
+}
