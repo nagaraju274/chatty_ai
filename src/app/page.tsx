@@ -353,6 +353,20 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (formState.error) {
+      toast({
+        variant: "destructive",
+        title: "An error occurred",
+        description: formState.error,
+      })
+    }
+
+    if (formState.suggestions) {
+      setSuggestions(formState.suggestions)
+    } else if (formState.response || formState.error) {
+      setSuggestions([])
+    }
+
     if (!formState.response && !formState.error) return
     if (activeConversationId === null) return
 
@@ -363,14 +377,12 @@ export default function Home() {
         let updatedMessages = [...c.messages]
 
         if (formState.error) {
-          if (updatedMessages[updatedMessages.length - 1]?.role === "user") {
+          if (
+            updatedMessages[updatedMessages.length - 1]?.role === "user" &&
+            !updatedMessages[updatedMessages.length - 1]?.sentiment
+          ) {
             updatedMessages.pop()
           }
-          toast({
-            variant: "destructive",
-            title: "An error occurred",
-            description: formState.error,
-          })
         }
 
         if (formState.response) {
@@ -392,12 +404,6 @@ export default function Home() {
         return { ...c, messages: updatedMessages }
       })
     )
-
-    if (formState.suggestions) {
-      setSuggestions(formState.suggestions)
-    } else if (formState.response || formState.error) {
-      setSuggestions([])
-    }
   }, [formState, activeConversationId, toast])
 
   const activeConversation = useMemo(
