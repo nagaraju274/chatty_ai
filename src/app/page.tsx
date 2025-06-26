@@ -46,44 +46,31 @@ export default function Home() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
   const { toast } = useToast()
-  const { pending } = useFormStatus();
-
-  // Add user message optimistically
-  useEffect(() => {
-    if (formRef.current?.prompt?.value) {
-      const prompt = formRef.current.prompt.value;
-      setMessages((prev) => [...prev, { role: "user", content: prompt }]);
-    }
-  }, [pending]);
-
+  const { pending } = useFormStatus()
 
   useEffect(() => {
     if (formState.response) {
       setMessages((prev) => {
-        // Replace user's optimistic message with the final one and add assistant's response
-        const newMessages = prev.filter(m => m.role !== 'user' || m.content !== formRef.current?.prompt.value);
-        return [
-          ...prev,
-          { role: "assistant", content: formState.response },
-        ]
+        // Just add assistant's response. User message was added optimistically.
+        return [...prev, { role: "assistant", content: formState.response }]
       })
     }
     if (formState.error) {
       // Remove optimistic user message on error
-      setMessages(prev => prev.slice(0, prev.length -1));
+      setMessages((prev) => prev.slice(0, prev.length - 1))
       toast({
         variant: "destructive",
         title: "An error occurred",
         description: formState.error,
       })
     }
-    if(!pending) {
-      formRef.current?.reset();
-      if(textAreaRef.current) {
-        textAreaRef.current.style.height = "auto";
+    if (!pending) {
+      formRef.current?.reset()
+      if (textAreaRef.current) {
+        textAreaRef.current.style.height = "auto"
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formState, toast])
 
   useEffect(() => {
@@ -96,17 +83,25 @@ export default function Home() {
   }, [messages])
 
   const handleTextareaInput = (event: React.FormEvent<HTMLTextAreaElement>) => {
-    const textarea = event.currentTarget;
-    textarea.style.height = "auto";
-    textarea.style.height = `${textarea.scrollHeight}px`;
-  };
+    const textarea = event.currentTarget
+    textarea.style.height = "auto"
+    textarea.style.height = `${textarea.scrollHeight}px`
+  }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      formRef.current?.requestSubmit();
+      event.preventDefault()
+      formRef.current?.requestSubmit()
     }
-  };
+  }
+
+  const clientAction = (formData: FormData) => {
+    const prompt = formData.get("prompt") as string
+    if (prompt) {
+      setMessages((prev) => [...prev, { role: "user", content: prompt }])
+      formAction(formData)
+    }
+  }
 
   return (
     <div className="flex h-screen flex-col">
@@ -140,19 +135,21 @@ export default function Home() {
         <ScrollArea className="h-full" ref={scrollAreaRef}>
           <div className="container mx-auto max-w-3xl space-y-6 p-4 md:p-6">
             {messages.length === 0 ? (
-                <Card className="mx-auto mt-10 max-w-md">
-                    <CardContent className="p-6 text-center">
-                        <Logo className="mx-auto h-12 w-12 text-primary"/>
-                        <h2 className="mt-4 text-2xl font-semibold">Welcome to Chatty</h2>
-                        <p className="mt-2 text-muted-foreground">
-                            Start a conversation by typing a message below.
-                        </p>
-                    </CardContent>
-                </Card>
+              <Card className="mx-auto mt-10 max-w-md">
+                <CardContent className="p-6 text-center">
+                  <Logo className="mx-auto h-12 w-12 text-primary" />
+                  <h2 className="mt-4 text-2xl font-semibold">
+                    Welcome to Chatty
+                  </h2>
+                  <p className="mt-2 text-muted-foreground">
+                    Start a conversation by typing a message below.
+                  </p>
+                </CardContent>
+              </Card>
             ) : (
-                messages.map((msg, index) => (
-                    <ChatMessage key={index} message={msg} />
-                ))
+              messages.map((msg, index) => (
+                <ChatMessage key={index} message={msg} />
+              ))
             )}
             {pending && <TypingIndicator />}
           </div>
@@ -163,7 +160,7 @@ export default function Home() {
         <div className="container mx-auto max-w-3xl p-4">
           <form
             ref={formRef}
-            action={formAction}
+            action={clientAction}
             className="relative"
           >
             <Textarea
