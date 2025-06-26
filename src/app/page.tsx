@@ -5,9 +5,10 @@ import {
   useRef,
   useEffect,
   useActionState,
+  useMemo,
 } from "react"
 import { useFormStatus } from "react-dom"
-import { ArrowUp, Settings } from "lucide-react"
+import { ArrowUp, Settings, PlusCircle } from "lucide-react"
 
 import { submitMessage } from "@/app/actions"
 import { ChatMessage, type ChatMessageProps } from "@/components/chat-message"
@@ -21,6 +22,17 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarInset,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Logo } from "@/components/icons"
 import { useToast } from "@/hooks/use-toast"
@@ -28,6 +40,12 @@ import { Card, CardContent } from "@/components/ui/card"
 import { TypingIndicator } from "@/components/typing-indicator"
 
 type Message = ChatMessageProps["message"]
+
+interface Conversation {
+  id: string
+  title: string
+  messages: Message[]
+}
 
 const initialState: {
   response?: string
@@ -106,6 +124,7 @@ function PageContent({
     <div className="flex h-screen flex-col">
       <header className="flex h-16 items-center justify-between border-b bg-card px-4 md:px-6">
         <div className="flex items-center gap-2">
+          <SidebarTrigger className="md:hidden" />
           <Logo className="h-6 w-6 text-primary" />
           <h1 className="text-lg font-semibold">Chatty</h1>
         </div>
@@ -141,7 +160,8 @@ function PageContent({
                     Welcome to Chatty
                   </h2>
                   <p className="mt-2 text-muted-foreground">
-                    Start a conversation by typing a message below.
+                    Start a conversation by typing a message below, or start a
+                    new chat.
                   </p>
                 </CardContent>
               </Card>
@@ -191,19 +211,61 @@ function PageContent({
 }
 
 export default function Home() {
-  const [messages, setMessages] = useState<Message[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [formState, formAction] = useActionState(submitMessage, initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const { toast } = useToast()
 
+  useEffect(() => {
+    const storedHistory = localStorage.getItem("chatHistory")
+    if (storedHistory) {
+      setConversations(JSON.parse(storedHistory))
+    }
+  }, [])
+
+  useEffect(() => {
+    if (conversations.length > 0) {
+      localStorage.setItem("chatHistory", JSON.stringify(conversations))
+    }
+  }, [conversations])
+
+  const handleNewChat = () => {
+    setActiveConversationId(null)
+    setSuggestions([])
+    formRef.current?.reset()
+  }
+
   const clientAction = (formData: FormData) => {
     const prompt = formData.get("prompt") as string
-    if (prompt.trim()) {
-      setSuggestions([])
-      setMessages((prev) => [...prev, { role: "user", content: prompt }])
-      formAction(formData)
+    if (!prompt.trim()) {
+      return
     }
+
+    setSuggestions([])
+    let conversationId = activeConversationId
+    
+    if (conversationId === null) {
+      conversationId = Date.now().toString()
+      const newConversation: Conversation = {
+        id: conversationId,
+        title: prompt.substring(0, 40) + (prompt.length > 40 ? "..." : ""),
+        messages: [{ role: "user", content: prompt }],
+      }
+      setConversations(prev => [newConversation, ...prev])
+      setActiveConversationId(conversationId)
+    } else {
+      setConversations(prev =>
+        prev.map(c =>
+          c.id === conversationId
+            ? { ...c, messages: [...c.messages, { role: "user", content: prompt }] }
+            : c
+        )
+      )
+    }
+
+    formAction(formData)
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -219,24 +281,35 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (!formState.response && !formState.error) return
+    if (!activeConversationId) return
+
     if (formState.response) {
-      setMessages((prev) => {
-        // Only add assistant message if the last message was from the user
-        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
-          return [...prev, { role: "assistant", content: formState.response }]
-        }
-        return prev
+      setConversations(prev => {
+        return prev.map(c => {
+          if (c.id === activeConversationId) {
+            const lastMessage = c.messages[c.messages.length - 1]
+            if (lastMessage?.role === "user") {
+              return { ...c, messages: [...c.messages, { role: "assistant", content: formState.response! }] }
+            }
+          }
+          return c
+        })
       })
     }
     
     if (formState.error) {
-      setMessages((prev) => {
-        // Only remove the optimistic user message
-        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
-          return prev.slice(0, prev.length - 1)
-        }
-        return prev
-      })
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id === activeConversationId) {
+            const lastMessage = c.messages[c.messages.length - 1]
+            if (lastMessage?.role === "user") {
+              return { ...c, messages: c.messages.slice(0, -1) }
+            }
+          }
+          return c
+        })
+      )
       toast({
         variant: "destructive",
         title: "An error occurred",
@@ -246,19 +319,51 @@ export default function Home() {
 
     if (formState.suggestions) {
       setSuggestions(formState.suggestions)
-    } else if(formState.response || formState.error) {
+    } else if (formState.response || formState.error) {
       setSuggestions([])
     }
-  }, [formState, toast])
+  }, [formState, activeConversationId, toast])
+  
+  const activeConversation = useMemo(() => 
+    conversations.find(c => c.id === activeConversationId),
+    [conversations, activeConversationId]
+  )
 
   return (
-    <form ref={formRef} action={clientAction}>
-      <PageContent
-        messages={messages}
-        suggestions={suggestions}
-        handleSuggestionClick={handleSuggestionClick}
-        formRef={formRef}
-      />
-    </form>
+    <SidebarProvider>
+      <Sidebar>
+        <SidebarHeader>
+          <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleNewChat}>
+            <PlusCircle />
+            New Chat
+          </Button>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            {conversations.map(convo => (
+              <SidebarMenuItem key={convo.id}>
+                <SidebarMenuButton
+                  onClick={() => setActiveConversationId(convo.id)}
+                  isActive={activeConversationId === convo.id}
+                  className="w-full"
+                >
+                  <span className="truncate">{convo.title}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarContent>
+      </Sidebar>
+      <SidebarInset>
+        <form ref={formRef} action={clientAction}>
+          <PageContent
+            messages={activeConversation?.messages ?? []}
+            suggestions={suggestions}
+            handleSuggestionClick={handleSuggestionClick}
+            formRef={formRef}
+          />
+        </form>
+      </SidebarInset>
+    </SidebarProvider>
   )
 }
