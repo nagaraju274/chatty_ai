@@ -37,27 +37,13 @@ const GenerateAIResponseOutputSchema = z.object({
 
 export type GenerateAIResponseOutput = z.infer<typeof GenerateAIResponseOutputSchema>;
 
-// Define the tool for content filtering
-const filterContent = ai.defineTool({
-  name: 'filterContent',
-  description: 'Identifies and filters inappropriate or harmful content in user input.',
-  inputSchema: z.object({
-    text: z.string().describe('The text to filter.'),
-  }),
-  outputSchema: z.boolean().describe('True if the content is safe, false otherwise.'),
-},
-async (input) => {
-  const result = await filterInappropriateContent(input);
-  return result.isAppropriate;
-});
-
 // Define the prompt
 const generateAIResponsePrompt = ai.definePrompt({
   name: 'generateAIResponsePrompt',
+  model: 'googleai/gemini-1.5-pro-latest',
   input: {schema: GenerateAIResponseInputSchema},
   output: {schema: GenerateAIResponseOutputSchema},
-  tools: [filterContent],
-  system: `You are a helpful and informative chatbot. Your role is to analyze both text prompts and any accompanying files (like images, text files, etc.) to provide comprehensive and accurate answers. If a file is provided, you MUST use it as the primary source of context for your response to the user's prompt. If the user's question contains potentially harmful content, use the filterContent tool to check the prompt. Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
+  system: `You are a helpful and informative chatbot. Your role is to analyze both text prompts and any accompanying files (like images, text files, etc.) to provide comprehensive and accurate answers. If a file is provided, you MUST use it as the primary source of context for your response to the user's prompt. Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
   prompt: `Based on the provided file, please answer the following question: {{prompt}}
 
 {{#if photoDataUri}}
