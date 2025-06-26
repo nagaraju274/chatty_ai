@@ -24,6 +24,7 @@ export type GenerateAIResponseInput = z.infer<typeof GenerateAIResponseInputSche
 // Define the output schema
 const GenerateAIResponseOutputSchema = z.object({
   response: z.string().describe('The AI-generated response.'),
+  suggestions: z.array(z.string()).describe('A list of 3-4 related questions the user might want to ask next.'),
 });
 
 export type GenerateAIResponseOutput = z.infer<typeof GenerateAIResponseOutputSchema>;
@@ -51,7 +52,7 @@ const generateAIResponsePrompt = ai.definePrompt({
   output: {schema: GenerateAIResponseOutputSchema},
   tools: [filterContent],
   system: `You are a helpful and informative chatbot.  If the user's question contains potentially harmful content, use the filterContent tool to check the prompt.
-Answer the prompt in a way that is helpful, creative, and engaging.`,
+Answer the prompt in a way that is helpful, creative, and engaging. After your response, provide a list of 3-4 related questions the user might want to ask next.`,
   prompt: `{{prompt}}`,
   config: {
     safetySettings: [
@@ -88,14 +89,17 @@ const generateAIResponseFlow = ai.defineFlow(
     const isSafe = await filterContent({text: input.prompt});
 
     if (!isSafe) {
-      return {response: 'I am sorry, I cannot respond to prompts containing potentially harmful content.'};
+      return {
+        response: 'I am sorry, I cannot respond to prompts containing potentially harmful content.',
+        suggestions: [],
+      };
     }
 
     // Generate the response
     const {output} = await generateAIResponsePrompt(input);
 
     // Return the response
-    return {response: output!.response};
+    return output!;
   }
 );
 

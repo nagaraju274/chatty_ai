@@ -18,7 +18,11 @@ import { TypingIndicator } from "@/components/typing-indicator"
 
 type Message = ChatMessageProps["message"]
 
-const initialState: { response?: string; error?: string } = {}
+const initialState: {
+  response?: string
+  error?: string
+  suggestions?: string[]
+} = {}
 
 function SubmitButton() {
   const { pending } = useFormStatus()
@@ -41,6 +45,7 @@ function SubmitButton() {
 
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([])
+  const [suggestions, setSuggestions] = useState<string[]>([])
   const [formState, formAction] = useFormState(submitMessage, initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const scrollAreaRef = useRef<HTMLDivElement>(null)
@@ -54,6 +59,7 @@ export default function Home() {
         // Just add assistant's response. User message was added optimistically.
         return [...prev, { role: "assistant", content: formState.response }]
       })
+      setSuggestions(formState.suggestions || [])
     }
     if (formState.error) {
       // Remove optimistic user message on error
@@ -63,6 +69,7 @@ export default function Home() {
         title: "An error occurred",
         description: formState.error,
       })
+      setSuggestions([])
     }
     if (!pending) {
       formRef.current?.reset()
@@ -80,7 +87,7 @@ export default function Home() {
         behavior: "smooth",
       })
     }
-  }, [messages])
+  }, [messages, suggestions])
 
   const handleTextareaInput = (event: React.FormEvent<HTMLTextAreaElement>) => {
     const textarea = event.currentTarget
@@ -98,9 +105,18 @@ export default function Home() {
   const clientAction = (formData: FormData) => {
     const prompt = formData.get("prompt") as string
     if (prompt) {
+      setSuggestions([])
       setMessages((prev) => [...prev, { role: "user", content: prompt }])
       formAction(formData)
     }
+  }
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setSuggestions([])
+    setMessages((prev) => [...prev, { role: "user", content: suggestion }])
+    const formData = new FormData()
+    formData.append("prompt", suggestion)
+    formAction(formData)
   }
 
   return (
@@ -152,6 +168,21 @@ export default function Home() {
               ))
             )}
             {pending && <TypingIndicator />}
+            {!pending && suggestions.length > 0 && (
+              <div className="flex flex-wrap items-center justify-start gap-2 pl-12">
+                {suggestions.map((s, i) => (
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => handleSuggestionClick(s)}
+                  >
+                    {s}
+                  </Button>
+                ))}
+              </div>
+            )}
           </div>
         </ScrollArea>
       </main>

@@ -19,7 +19,7 @@ export async function submitMessage(prevState: any, formData: FormData) {
 
   try {
     const response = await generateAIResponse({ prompt: parsed.data.prompt })
-    return { response: response.response }
+    return { response: response.response, suggestions: response.suggestions }
   } catch (error) {
     console.error("Error generating AI response:", error)
     return { error: "Failed to get a response from the AI. Please try again." }
