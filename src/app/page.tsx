@@ -313,13 +313,23 @@ export default function Home() {
 
     setSuggestions([])
     let conversationId = activeConversationId
+    
+    const userMessage: Message = {
+      role: 'user',
+      content: prompt,
+      attachment: attachedFile ?? undefined,
+    };
 
     if (conversationId === null) {
       conversationId = Date.now().toString()
+      let title = prompt.trim()
+      if (!title && attachedFile) {
+        title = attachedFile.name
+      }
       const newConversation: Conversation = {
         id: conversationId,
-        title: prompt.substring(0, 40) + (prompt.length > 40 ? "..." : ""),
-        messages: [{ role: "user", content: prompt }],
+        title: title.substring(0, 40) + (title.length > 40 ? "..." : ""),
+        messages: [userMessage],
       }
       setConversations((prev) => [newConversation, ...prev])
       setActiveConversationId(conversationId)
@@ -329,7 +339,7 @@ export default function Home() {
           c.id === conversationId
             ? {
                 ...c,
-                messages: [...c.messages, { role: "user", content: prompt }],
+                messages: [...c.messages, userMessage],
               }
             : c
         )
@@ -404,7 +414,17 @@ export default function Home() {
         return { ...c, messages: updatedMessages }
       })
     )
-  }, [formState, activeConversationId, toast])
+  }, [formState, activeConversationId])
+  
+  useEffect(() => {
+    if (formState.error) {
+      toast({
+        variant: 'destructive',
+        title: 'An error occurred',
+        description: formState.error,
+      });
+    }
+  }, [formState.error, toast]);
 
   const activeConversation = useMemo(
     () => conversations.find((c) => c.id === activeConversationId),

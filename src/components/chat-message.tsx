@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from 'react'
+import Image from "next/image"
 import { Bot, User, Check, Copy, Smile, Frown, Meh } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -11,6 +12,10 @@ export interface ChatMessageProps {
     role: "user" | "assistant"
     content: string
     sentiment?: 'Positive' | 'Negative' | 'Neutral'
+    attachment?: {
+        name: string;
+        dataUri: string;
+    }
   }
 }
 
@@ -83,6 +88,7 @@ const SentimentIcon = ({ sentiment }: { sentiment: ChatMessageProps['message']['
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isAssistant = message.role === "assistant"
+  const hasContent = message.content && message.content.trim().length > 0
 
   return (
     <div
@@ -99,14 +105,29 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       <div
         className={cn(
-          "flex items-center gap-2 max-w-xl break-words rounded-lg px-4 py-2 text-sm shadow-sm",
+          "max-w-xl break-words rounded-lg shadow-sm",
           isAssistant
             ? "bg-card text-card-foreground"
-            : "bg-primary text-primary-foreground"
+            : "bg-primary text-primary-foreground",
+          { "overflow-hidden": message.attachment }
         )}
       >
-        <div>{renderContent(message.content)}</div>
-        {!isAssistant && <SentimentIcon sentiment={message.sentiment} />}
+        {message.attachment && message.attachment.dataUri.startsWith("data:image/") && (
+          <Image 
+            src={message.attachment.dataUri} 
+            alt={message.attachment.name} 
+            width={300} 
+            height={200}
+            className="object-cover"
+          />
+        )}
+        
+        {hasContent && (
+          <div className="flex items-center gap-2 px-4 py-2 text-sm">
+            <div>{renderContent(message.content)}</div>
+            {!isAssistant && <SentimentIcon sentiment={message.sentiment} />}
+          </div>
+        )}
       </div>
     </div>
   )
