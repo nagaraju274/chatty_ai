@@ -4,8 +4,6 @@ import {
   useState,
   useRef,
   useEffect,
-  type Dispatch,
-  type SetStateAction,
   useActionState,
 } from "react"
 import { useFormStatus } from "react-dom"
@@ -59,8 +57,6 @@ function SubmitButton() {
 interface PageContentProps {
   messages: Message[]
   suggestions: string[]
-  formState: typeof initialState
-  setMessages: Dispatch<SetStateAction<Message[]>>
   handleSuggestionClick: (suggestion: string) => void
   formRef: React.RefObject<HTMLFormElement>
 }
@@ -68,38 +64,21 @@ interface PageContentProps {
 function PageContent({
   messages,
   suggestions,
-  formState,
-  setMessages,
   handleSuggestionClick,
   formRef,
 }: PageContentProps) {
   const { pending } = useFormStatus()
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const textAreaRef = useRef<HTMLTextAreaElement>(null)
-  const { toast } = useToast()
 
   useEffect(() => {
-    if (formState.response) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: formState.response },
-      ])
-    }
-    if (formState.error) {
-      setMessages((prev) => prev.slice(0, prev.length - 1))
-      toast({
-        variant: "destructive",
-        title: "An error occurred",
-        description: formState.error,
-      })
-    }
     if (!pending) {
       formRef.current?.reset()
       if (textAreaRef.current) {
         textAreaRef.current.style.height = "auto"
       }
     }
-  }, [formState, pending, setMessages, formRef, toast])
+  }, [pending, formRef])
 
   useEffect(() => {
     if (scrollAreaRef.current) {
@@ -216,6 +195,7 @@ export default function Home() {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [formState, formAction] = useActionState(submitMessage, initialState)
   const formRef = useRef<HTMLFormElement>(null)
+  const { toast } = useToast()
 
   const clientAction = (formData: FormData) => {
     const prompt = formData.get("prompt") as string
@@ -239,21 +219,43 @@ export default function Home() {
   }
 
   useEffect(() => {
+    if (formState.response) {
+      setMessages((prev) => {
+        // Only add assistant message if the last message was from the user
+        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
+          return [...prev, { role: "assistant", content: formState.response }]
+        }
+        return prev
+      })
+    }
+    
+    if (formState.error) {
+      setMessages((prev) => {
+        // Only remove the optimistic user message
+        if (prev.length > 0 && prev[prev.length - 1].role === "user") {
+          return prev.slice(0, prev.length - 1)
+        }
+        return prev
+      })
+      toast({
+        variant: "destructive",
+        title: "An error occurred",
+        description: formState.error,
+      })
+    }
+
     if (formState.suggestions) {
       setSuggestions(formState.suggestions)
-    }
-    if (formState.error) {
+    } else if(formState.response || formState.error) {
       setSuggestions([])
     }
-  }, [formState])
+  }, [formState, toast])
 
   return (
     <form ref={formRef} action={clientAction}>
       <PageContent
         messages={messages}
         suggestions={suggestions}
-        formState={formState}
-        setMessages={setMessages}
         handleSuggestionClick={handleSuggestionClick}
         formRef={formRef}
       />
