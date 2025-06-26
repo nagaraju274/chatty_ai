@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from 'react'
-import { Bot, User, Check, Copy } from "lucide-react"
+import { Bot, User, Check, Copy, Smile, Frown, Meh } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from './ui/button'
@@ -10,6 +10,7 @@ export interface ChatMessageProps {
   message: {
     role: "user" | "assistant"
     content: string
+    sentiment?: 'Positive' | 'Negative' | 'Neutral'
   }
 }
 
@@ -64,6 +65,21 @@ function renderContent(content: string) {
     });
 }
 
+const SentimentIcon = ({ sentiment }: { sentiment: ChatMessageProps['message']['sentiment'] }) => {
+  if (!sentiment) return null;
+
+  switch (sentiment) {
+    case 'Positive':
+      return <Smile className="h-4 w-4 shrink-0" />;
+    case 'Negative':
+      return <Frown className="h-4 w-4 shrink-0" />;
+    case 'Neutral':
+      return <Meh className="h-4 w-4 shrink-0" />;
+    default:
+      return null;
+  }
+};
+
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isAssistant = message.role === "assistant"
@@ -83,13 +99,14 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
       <div
         className={cn(
-          "max-w-xl break-words rounded-lg px-4 py-2 text-sm shadow-sm",
+          "flex items-center gap-2 max-w-xl break-words rounded-lg px-4 py-2 text-sm shadow-sm",
           isAssistant
             ? "bg-card text-card-foreground"
             : "bg-primary text-primary-foreground"
         )}
       >
-        {renderContent(message.content)}
+        <div>{renderContent(message.content)}</div>
+        {!isAssistant && <SentimentIcon sentiment={message.sentiment} />}
       </div>
     </div>
   )

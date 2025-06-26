@@ -51,6 +51,7 @@ const initialState: {
   response?: string
   error?: string
   suggestions?: string[]
+  sentiment?: "Positive" | "Negative" | "Neutral"
 } = {}
 
 function SubmitButton() {
@@ -284,38 +285,39 @@ export default function Home() {
     if (!formState.response && !formState.error) return
     if (!activeConversationId) return
 
-    if (formState.response) {
-      setConversations(prev => {
-        return prev.map(c => {
-          if (c.id === activeConversationId) {
-            const lastMessage = c.messages[c.messages.length - 1]
-            if (lastMessage?.role === "user") {
-              return { ...c, messages: [...c.messages, { role: "assistant", content: formState.response! }] }
+    setConversations(prev =>
+      prev.map(c => {
+        if (c.id !== activeConversationId) return c
+
+        let updatedMessages = [...c.messages]
+
+        if (formState.error) {
+          if (updatedMessages[updatedMessages.length - 1]?.role === 'user') {
+            updatedMessages.pop()
+          }
+          toast({
+            variant: "destructive",
+            title: "An error occurred",
+            description: formState.error,
+          })
+        }
+
+        if (formState.response) {
+          const userMessageIndex = updatedMessages.findLastIndex(
+            m => m.role === "user" && !m.sentiment
+          )
+          if (userMessageIndex !== -1 && formState.sentiment) {
+            updatedMessages[userMessageIndex] = {
+              ...updatedMessages[userMessageIndex],
+              sentiment: formState.sentiment,
             }
           }
-          return c
-        })
+          updatedMessages.push({ role: "assistant", content: formState.response })
+        }
+
+        return { ...c, messages: updatedMessages }
       })
-    }
-    
-    if (formState.error) {
-      setConversations(prev =>
-        prev.map(c => {
-          if (c.id === activeConversationId) {
-            const lastMessage = c.messages[c.messages.length - 1]
-            if (lastMessage?.role === "user") {
-              return { ...c, messages: c.messages.slice(0, -1) }
-            }
-          }
-          return c
-        })
-      )
-      toast({
-        variant: "destructive",
-        title: "An error occurred",
-        description: formState.error,
-      })
-    }
+    )
 
     if (formState.suggestions) {
       setSuggestions(formState.suggestions)
@@ -323,9 +325,9 @@ export default function Home() {
       setSuggestions([])
     }
   }, [formState, activeConversationId, toast])
-  
-  const activeConversation = useMemo(() => 
-    conversations.find(c => c.id === activeConversationId),
+
+  const activeConversation = useMemo(
+    () => conversations.find(c => c.id === activeConversationId),
     [conversations, activeConversationId]
   )
 
@@ -333,7 +335,11 @@ export default function Home() {
     <SidebarProvider>
       <Sidebar>
         <SidebarHeader>
-          <Button variant="ghost" className="w-full justify-start gap-2" onClick={handleNewChat}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2"
+            onClick={handleNewChat}
+          >
             <PlusCircle />
             New Chat
           </Button>
