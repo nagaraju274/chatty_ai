@@ -29,11 +29,8 @@ const prompt = ai.definePrompt({
   model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: AnalyzeSentimentInputSchema},
   output: {schema: AnalyzeSentimentOutputSchema},
-  prompt: `You are a sentiment analysis expert. Analyze the sentiment of the following text and classify it as Positive, Negative, or Neutral.
-
-Respond with ONLY a JSON object that conforms to the specified output schema.
-
-Text: {{{text}}}`,
+  system: `You are a sentiment analysis expert. Analyze the sentiment of the text and classify it as Positive, Negative, or Neutral. Respond with ONLY a JSON object that conforms to the specified output schema.`,
+  prompt: `{{{text}}}`,
 });
 
 const analyzeSentimentFlow = ai.defineFlow(
