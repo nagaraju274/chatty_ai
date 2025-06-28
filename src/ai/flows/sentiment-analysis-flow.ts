@@ -26,13 +26,14 @@ export async function analyzeSentiment(input: AnalyzeSentimentInput): Promise<An
 
 const prompt = ai.definePrompt({
   name: 'analyzeSentimentPrompt',
+  model: 'googleai/gemini-1.5-flash-latest',
   input: {schema: AnalyzeSentimentInputSchema},
   output: {schema: AnalyzeSentimentOutputSchema},
   prompt: `You are a sentiment analysis expert. Analyze the sentiment of the following text and classify it as Positive, Negative, or Neutral.
-  
-Text: {{{text}}}
 
-Provide only the classification.`,
+Respond with ONLY a JSON object that conforms to the specified output schema.
+
+Text: {{{text}}}`,
 });
 
 const analyzeSentimentFlow = ai.defineFlow(

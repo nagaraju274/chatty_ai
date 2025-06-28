@@ -13,7 +13,6 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { filterInappropriateContent } from './filter-inappropriate-content';
 
 // Define the input schema
 const GenerateAIResponseInputSchema = z.object({
@@ -84,16 +83,6 @@ const generateAIResponseFlow = ai.defineFlow(
     outputSchema: GenerateAIResponseOutputSchema,
   },
   async input => {
-    // Use the content filter tool
-    const safetyCheck = await filterInappropriateContent({text: input.prompt});
-
-    if (!safetyCheck.isAppropriate) {
-      return {
-        response: 'I am sorry, I cannot respond to prompts containing potentially harmful content.',
-        suggestions: [],
-      };
-    }
-
     // Generate the response
     const {output} = await generateAIResponsePrompt(input);
 
